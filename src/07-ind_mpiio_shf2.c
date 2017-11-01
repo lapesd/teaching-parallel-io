@@ -22,15 +22,16 @@ main (int argc, char **argv)
 {
 	int nprocs, rank;
 	int sqrnprocs;
-	int fd;
-	int oflag = O_CREAT | O_RDWR;
-	mode_t mode = S_IRUSR |S_IWUSR | S_IRGRP | S_IROTH;
+	MPI_File file;
+	MPI_Status status;
+	MPI_Offset off;
+	int mode = MPI_MODE_CREATE | MPI_MODE_RDWR;
 	int s;
 	double **bw;
 	double **br;
 	int i, j;
-	off_t off;
-	ssize_t ret, total;
+	int ret;
+	ssize_t total;
 
 	assert (argc == 2);
 
@@ -39,8 +40,8 @@ main (int argc, char **argv)
 	MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 	sqrnprocs = sqrt (nprocs);
 
-	fd = open (argv[1], oflag, mode);
-	assert (fd > -1);
+	ret = MPI_File_open (MPI_COMM_WORLD, argv[1], mode, MPI_INFO_NULL, &file);
+        assert (ret == MPI_SUCCESS);
 
 	s = SIZE / sqrnprocs;
 	
@@ -50,13 +51,9 @@ main (int argc, char **argv)
 	for (i = 0; i < s; i++)
 	{
 		off = ((rank / sqrnprocs * s + i) * SIZE * sizeof (double)) + ((rank % sqrnprocs * s) * sizeof (double));
-		lseek (fd, off, SEEK_SET);
-		for (j = 0; j < s; j++)
-		{
-			ret = write (fd, &bw[i][j], sizeof (double));
-			assert (ret > -1);
-			total += ret;
-		}
+		ret = MPI_File_write_at (file, off, bw[i], s, MPI_DOUBLE, &status);
+		assert (ret == MPI_SUCCESS);
+                total += s * sizeof (double);
 	}
 	fprintf (stdout, "Rank %d: %ld bytes written.\n", rank, total);
 	MPI_Barrier (MPI_COMM_WORLD);
@@ -66,13 +63,9 @@ main (int argc, char **argv)
 	for (i = 0; i < s; i++)
 	{
 		off = ((rank / sqrnprocs * s + i) * SIZE * sizeof (double)) + ((rank % sqrnprocs * s) * sizeof (double));
-		lseek (fd, off, SEEK_SET);
-		for (j = 0; j < s; j++)
-		{
-			ret = read (fd, &br[i][j], sizeof (double));
-			assert (ret > -1);
-			total += ret;
-		}
+		ret = MPI_File_read_at (file, off, br[i], s, MPI_DOUBLE, &status);
+                assert (ret == MPI_SUCCESS);
+                total += s * sizeof (double);
 	}
 	fprintf (stdout, "Rank %d: %ld bytes read.\n", rank, total);	
 	MPI_Barrier (MPI_COMM_WORLD);
@@ -80,7 +73,9 @@ main (int argc, char **argv)
 	printarray2d (br, s, s, rank);
 	MPI_Barrier (MPI_COMM_WORLD);
 
-	close (fd);
+	MPI_File_close (&file);
+
+	MPI_Finalize ();
 
 	exit (EXIT_FAILURE);
 }

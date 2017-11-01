@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <mpi.h>
 #include <math.h>
-#include <string.h>
 
 #define SIZE 8
 
@@ -23,7 +22,6 @@ main (int argc, char **argv)
 {
 	int nprocs, rank;
 	int sqrnprocs;
-	char *fname;
 	int fd;
 	int oflag = O_CREAT | O_RDWR;
 	mode_t mode = S_IRUSR |S_IWUSR | S_IRGRP | S_IROTH;
@@ -31,6 +29,7 @@ main (int argc, char **argv)
 	double **bw;
 	double **br;
 	int i, j;
+	off_t off;
 	ssize_t ret, total;
 
 	assert (argc == 2);
@@ -40,11 +39,7 @@ main (int argc, char **argv)
 	MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 	sqrnprocs = sqrt (nprocs);
 
-	fname = malloc ((strlen (argv[1]) + 1) * sizeof (char));
-	assert (fname);
-	sprintf (fname, "%s.%d", argv[1], rank);
-
-	fd = open (fname, oflag, mode);
+	fd = open (argv[1], oflag, mode);
 	assert (fd > -1);
 
 	s = SIZE / sqrnprocs;
@@ -53,25 +48,32 @@ main (int argc, char **argv)
 	fillarray2d (bw, s, s, nprocs, rank);
 	total = 0;
 	for (i = 0; i < s; i++)
+	{
+		off = ((rank / sqrnprocs * s + i) * SIZE * sizeof (double)) + ((rank % sqrnprocs * s) * sizeof (double));
+		lseek (fd, off, SEEK_SET);
 		for (j = 0; j < s; j++)
 		{
 			ret = write (fd, &bw[i][j], sizeof (double));
 			assert (ret > -1);
 			total += ret;
 		}
+	}
 	fprintf (stdout, "Rank %d: %ld bytes written.\n", rank, total);
 	MPI_Barrier (MPI_COMM_WORLD);
 
 	br = array2d (s, s);
 	total = 0;
-	lseek (fd, 0, SEEK_SET);
 	for (i = 0; i < s; i++)
+	{
+		off = ((rank / sqrnprocs * s + i) * SIZE * sizeof (double)) + ((rank % sqrnprocs * s) * sizeof (double));
+		lseek (fd, off, SEEK_SET);
 		for (j = 0; j < s; j++)
 		{
 			ret = read (fd, &br[i][j], sizeof (double));
 			assert (ret > -1);
 			total += ret;
 		}
+	}
 	fprintf (stdout, "Rank %d: %ld bytes read.\n", rank, total);	
 	MPI_Barrier (MPI_COMM_WORLD);
 
@@ -79,6 +81,8 @@ main (int argc, char **argv)
 	MPI_Barrier (MPI_COMM_WORLD);
 
 	close (fd);
+
+	MPI_Finalize ();
 
 	exit (EXIT_FAILURE);
 }

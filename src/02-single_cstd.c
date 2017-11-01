@@ -33,12 +33,11 @@ main (int argc, char **argv)
 	fillarray2d (bw, SIZE, SIZE);
 	total = 0;
 	for (i = 0; i < SIZE; i++)
-		//for (j = 0; j < SIZE; j++)
-		{
-			ret = fwrite (bw[i], sizeof (double), SIZE, file);
-			assert (ret == SIZE);
-			total += ret * sizeof (double);
-		}
+	{
+		ret = fwrite (bw[i], sizeof (double), SIZE, file);
+		assert (ret == SIZE);
+		total += ret * sizeof (double);
+	}
 	fprintf (stdout, "%ld bytes written.\n", total);
 	fclose (file);
 
@@ -48,12 +47,11 @@ main (int argc, char **argv)
 	br = array2d (SIZE, SIZE);
 	total = 0;
 	for (i = 0; i < SIZE; i++)
-		// for (j = 0; j < SIZE; j++)
-		{
-			ret = fread (br[i], sizeof (double), SIZE, file);
-			assert (ret == SIZE);
-			total += ret * sizeof (double);
-		}
+	{
+		ret = fread (br[i], sizeof (double), SIZE, file);
+		assert (ret == SIZE);
+		total += ret * sizeof (double);
+	}
 	fprintf (stdout, "%ld bytes read.\n", total);	
 
 	printarray2d (br, SIZE, SIZE);
